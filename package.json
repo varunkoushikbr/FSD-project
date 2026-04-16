@@ -1,0 +1,11 @@
+{
+  "name": "productivity-tracker",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "concurrently \"cd backend && node server.js\" \"cd frontend && npm start\""
+  },
+  "dependencies": {
+    "mongodb": "^7.1.1"
+  }
+}

@@ -1,0 +1,43 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-[#f8fafc] text-slate-900 antialiased;
+}
+
+.react-calendar {
+  @apply !border-none !w-full !rounded-2xl !bg-white !shadow-soft !p-4 !font-sans !text-sm;
+}
+
+.react-calendar__tile--now {
+  @apply !bg-blue-50 !text-blue-600 !rounded-lg;
+}
+
+.react-calendar__tile--active {
+  @apply !bg-blue-600 !text-white !rounded-lg;
+}
+
+.highlight-completed {
+  @apply !bg-emerald-50 !text-emerald-600 !font-bold !rounded-lg;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 5px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  @apply bg-slate-200 rounded-full hover:bg-slate-300;
+}
+
+.milestone-unlocked {
+  @apply bg-white border-2 border-emerald-500 shadow-lg scale-105;
+}
+
+.milestone-locked {
+  @apply bg-slate-50 opacity-60 border-2 border-transparent grayscale;
+}
