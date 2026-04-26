@@ -14,9 +14,30 @@ const taskSchema = new mongoose.Schema({
         type: Boolean,
         default: false
     },
+    status: {
+        type: String,
+        enum: ['pending', 'in-progress', 'completed'],
+        default: 'pending'
+    },
     date: {
         type: Date,
         default: Date.now
+    },
+    estimatedTime: {
+        type: Number, // in minutes
+        default: 0
+    },
+    actualTime: {
+        type: Number, // in minutes
+        default: 0
+    },
+    startTime: {
+        type: Date,
+        default: null
+    },
+    points: {
+        type: Number,
+        default: 0
     }
 }, {
     timestamps: true

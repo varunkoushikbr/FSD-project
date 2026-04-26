@@ -6,22 +6,36 @@ body {
   @apply bg-[#f8fafc] text-slate-900 antialiased;
 }
 
+/* Custom Calendar Styles */
 .react-calendar {
-  @apply !border-none !w-full !rounded-2xl !bg-white !shadow-soft !p-4 !font-sans !text-sm;
-}
-
-.react-calendar__tile--now {
-  @apply !bg-blue-50 !text-blue-600 !rounded-lg;
+    @apply !border-none !w-full !rounded-2xl !bg-white !shadow-sm !p-4 !font-sans !text-sm;
 }
 
 .react-calendar__tile--active {
-  @apply !bg-blue-600 !text-white !rounded-lg;
+    background: #4f46e5 !important;
+    border-radius: 12px;
+    color: white !important;
 }
 
-.highlight-completed {
-  @apply !bg-emerald-50 !text-emerald-600 !font-bold !rounded-lg;
+.react-calendar__tile--now {
+    background: #eef2ff !important;
+    border-radius: 12px;
+    color: #4f46e5 !important;
 }
 
+.react-calendar__navigation button:enabled:hover,
+.react-calendar__navigation button:enabled:focus {
+    background-color: #f8fafc !important;
+    border-radius: 12px;
+}
+
+.react-calendar__tile:enabled:hover,
+.react-calendar__tile:enabled:focus {
+    background-color: #f1f5f9 !important;
+    border-radius: 12px;
+}
+
+/* Custom Scrollbar */
 .custom-scrollbar::-webkit-scrollbar {
   width: 5px;
 }

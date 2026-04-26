@@ -31,6 +31,19 @@ const userSchema = new mongoose.Schema({
     lastCompletedDate: {
         type: Date,
         default: null
+    },
+    role: {
+        type: String,
+        enum: ['student', 'professional', 'other'],
+        default: 'other'
+    },
+    points: {
+        type: Number,
+        default: 0
+    },
+    totalPoints: {
+        type: Number,
+        default: 0
     }
 }, {
     timestamps: true
