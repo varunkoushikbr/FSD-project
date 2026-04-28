@@ -17,14 +17,34 @@ import Navbar from '../components/Navbar';
 import ProductivityChart from '../components/ProductivityChart';
 import MilestoneOverlay from '../components/MilestoneOverlay';
 
+const TimerDisplay = ({ startTime }) => {
+    const [elapsed, setElapsed] = useState(0);
+
+    useEffect(() => {
+        if (!startTime) return;
+        const calcElapsed = () => Math.floor((Date.now() - new Date(startTime).getTime()) / 1000);
+        setElapsed(calcElapsed());
+        const interval = setInterval(() => {
+            setElapsed(calcElapsed());
+        }, 1000);
+        return () => clearInterval(interval);
+    }, [startTime]);
+
+    const mins = Math.floor(elapsed / 60);
+    const secs = elapsed % 60;
+    return <span className="text-rose-500 font-bold tabular-nums ml-1">{mins.toString().padStart(2, '0')}:{secs.toString().padStart(2, '0')}</span>;
+};
+
 const Dashboard = () => {
   const [tasks, setTasks] = useState([]);
   const [newTask, setNewTask] = useState('');
+  const [estimatedHours, setEstimatedHours] = useState('');
   const [estimatedTime, setEstimatedTime] = useState('');
-  const [repeatDays, setRepeatDays] = useState('1');
+  const [repeatDays, setRepeatDays] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [chartData, setChartData] = useState([]);
+  const [pieData, setPieData] = useState([]);
   const [user, setUser] = useState(null);
   const [milestone, setMilestone] = useState(null);
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -38,9 +58,9 @@ const Dashboard = () => {
   const fetchInitialData = async () => {
     try {
       setLoading(true);
-      const dateStr = selectedDate.toISOString().split('T')[0];
+      const localDateStr = new Date(selectedDate.getTime() - selectedDate.getTimezoneOffset() * 60000).toISOString().split('T')[0];
       const [tasksRes, allTasksRes, userRes] = await Promise.all([
-        api.get(`/tasks?date=${dateStr}`),
+        api.get(`/tasks?date=${localDateStr}`),
         api.get('/tasks'),
         api.get('/auth/me')
       ]);
@@ -57,16 +77,27 @@ const Dashboard = () => {
   };
 
   const processChartData = (allTasks) => {
+    // Productivity Chart (Last 7 Days Completed)
     const last7Days = [...Array(7)].map((_, i) => {
       const d = new Date();
       d.setDate(d.getDate() - i);
-      const dateStr = d.toISOString().split('T')[0];
+      const dateStr = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().split('T')[0];
       const count = allTasks.filter(t => 
-        t.completed && new Date(t.date).toISOString().split('T')[0] === dateStr
+        t.completed && t.updatedAt && new Date(t.updatedAt).toISOString().split('T')[0] === dateStr
       ).length;
       return { date: d.toLocaleDateString(undefined, { weekday: 'short' }), completed: count };
     }).reverse();
     setChartData(last7Days);
+
+    // Pie Chart Data (Status Distribution for all tasks)
+    const completed = allTasks.filter(t => t.completed).length;
+    const inProgress = allTasks.filter(t => !t.completed && t.status === 'in-progress').length;
+    const pending = allTasks.filter(t => !t.completed && t.status === 'pending').length;
+    setPieData([
+        { name: 'Completed', value: completed, color: '#10b981' },
+        { name: 'In Progress', value: inProgress, color: '#f59e0b' },
+        { name: 'Pending', value: pending, color: '#6366f1' }
+    ]);
   };
 
   const addTask = async (e) => {
@@ -74,24 +105,30 @@ const Dashboard = () => {
     if (!newTask.trim()) return;
     try {
       const daysToRepeat = parseInt(repeatDays) || 1;
+      const totalMins = (parseInt(estimatedHours) || 0) * 60 + (parseInt(estimatedTime) || 0);
+      const localDateStr = new Date(selectedDate.getTime() - selectedDate.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+
       const res = await api.post('/tasks', { 
         title: newTask, 
-        estimatedTime: parseInt(estimatedTime) || 0,
-        date: selectedDate,
+        estimatedTime: totalMins,
+        date: localDateStr,
         days: daysToRepeat
       });
       
       if (Array.isArray(res.data)) {
-          const dateStr = selectedDate.toISOString().split('T')[0];
-          const tasksForToday = res.data.filter(t => t.date.split('T')[0] === dateStr);
+          const tasksForToday = res.data.filter(t => {
+              const tDateStr = new Date(t.date).toISOString().split('T')[0];
+              return tDateStr === localDateStr || t.date.split('T')[0] === localDateStr;
+          });
           setTasks([...tasksForToday, ...tasks]);
       } else {
           setTasks([res.data, ...tasks]);
       }
       
       setNewTask('');
+      setEstimatedHours('');
       setEstimatedTime('');
-      setRepeatDays('1');
+      setRepeatDays('');
     } catch (err) {
       setError('Task creation failed.');
     }
@@ -234,11 +271,11 @@ const Dashboard = () => {
                 className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 shadow-sm border border-slate-100 dark:border-slate-800"
             >
                 <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-lg font-black tracking-tight dark:text-white">Productivity</h3>
+                    <h3 className="text-lg font-black tracking-tight dark:text-white">Analytics</h3>
                     <TrendingUp size={20} className="text-emerald-500" />
                 </div>
-                <div className="h-52">
-                    <ProductivityChart data={chartData} />
+                <div className="h-64">
+                    <ProductivityChart data={chartData} pieData={pieData} />
                 </div>
             </motion.div>
           </section>
@@ -263,7 +300,7 @@ const Dashboard = () => {
               </div>
 
               <form onSubmit={addTask} className="grid grid-cols-1 md:grid-cols-12 gap-3 mb-10">
-                <div className="md:col-span-6 relative group">
+                <div className="md:col-span-5 relative group">
                     <input
                         type="text"
                         placeholder="What's your next win?"
@@ -272,22 +309,42 @@ const Dashboard = () => {
                         className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 dark:focus:border-indigo-500 transition-all font-bold dark:text-white placeholder:text-slate-400"
                     />
                 </div>
-                <div className="md:col-span-2 relative">
+                <div className="md:col-span-3 relative flex gap-2">
                     <input
                         type="number"
+                        min="0"
+                        placeholder="Hrs"
+                        value={estimatedHours}
+                        onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === '' || Number(val) >= 0) setEstimatedHours(val);
+                        }}
+                        className="w-full px-2 py-4 bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-bold dark:text-white text-center"
+                    />
+                    <input
+                        type="number"
+                        min="0"
+                        max="59"
                         placeholder="Mins"
                         value={estimatedTime}
-                        onChange={(e) => setEstimatedTime(e.target.value)}
-                        className="w-full px-4 py-4 bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-bold dark:text-white text-center"
+                        onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === '' || (Number(val) >= 0 && Number(val) <= 59)) setEstimatedTime(val);
+                        }}
+                        className="w-full px-2 py-4 bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-bold dark:text-white text-center"
                     />
                 </div>
                 <div className="md:col-span-2 relative flex items-center gap-2 bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl px-3 group">
                     <Repeat size={16} className="text-slate-400 group-focus-within:text-indigo-500" />
                     <input
                         type="number"
+                        min="1"
                         placeholder="Days"
                         value={repeatDays}
-                        onChange={(e) => setRepeatDays(e.target.value)}
+                        onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === '' || Number(val) > 0) setRepeatDays(val);
+                        }}
                         className="w-full bg-transparent border-none focus:ring-0 font-bold dark:text-white text-center p-0"
                         title="Repeat for how many days?"
                     />
@@ -337,10 +394,14 @@ const Dashboard = () => {
                             <span className={`text-base font-black block transition-all ${task.completed ? 'line-through text-slate-400' : 'text-slate-800 dark:text-slate-100'}`}>
                                 {task.title}
                             </span>
-                            <div className="flex gap-4 text-[10px] uppercase font-black tracking-widest text-slate-400 dark:text-slate-500 mt-1.5">
-                                <span className="flex items-center gap-1.5"><Target size={10} /> Est: {task.estimatedTime}m</span>
-                                <span className="flex items-center gap-1.5 text-indigo-500 dark:text-indigo-400"><TrendingUp size={10} /> Act: {task.actualTime}m</span>
+                            <div className="flex gap-4 text-[10px] uppercase font-black tracking-widest text-slate-400 dark:text-slate-500 mt-1.5 flex-wrap">
+                                <span className="flex items-center gap-1.5"><CalendarIcon size={10} /> {new Date(task.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+                                <span className="flex items-center gap-1.5"><Target size={10} /> Est: {Math.floor(task.estimatedTime / 60)}h {task.estimatedTime % 60}m</span>
+                                <span className="flex items-center gap-1.5 text-indigo-500 dark:text-indigo-400"><TrendingUp size={10} /> Act: {Math.floor(task.actualTime / 60)}h {task.actualTime % 60}m</span>
                                 {task.points > 0 && <span className="text-amber-500 flex items-center gap-1.5"><Sparkles size={10} /> {task.points} pts</span>}
+                                {task.status === 'in-progress' && task.startTime && (
+                                    <span className="flex items-center gap-1.5"><TimerDisplay startTime={task.startTime} /></span>
+                                )}
                             </div>
                           </div>
                         </div>
@@ -379,7 +440,7 @@ const Dashboard = () => {
                   )}
                 </AnimatePresence>
               </div>
-            </div>
+            </motion.div>
           </section>
 
         </div>

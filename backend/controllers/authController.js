@@ -6,7 +6,8 @@ const jwt = require('jsonwebtoken');
 // @route   POST /api/auth/signup
 exports.signup = async (req, res) => {
     try {
-        const { name, email, password } = req.body;
+        let { name, email, password } = req.body;
+        email = email ? email.toLowerCase().trim() : '';
 
         // Check if user exists
         const userExists = await User.findOne({ email });
@@ -43,22 +44,46 @@ exports.signup = async (req, res) => {
 // @route   POST /api/auth/login
 exports.login = async (req, res) => {
     try {
-        const { email, password } = req.body;
+        let { email, password } = req.body;
+        email = email ? email.toLowerCase().trim() : '';
 
         // Check for user email
         const user = await User.findOne({ email }).select('+password');
 
-        if (user && (await bcrypt.compare(password, user.password))) {
-            res.json({
-                _id: user.id,
-                name: user.name,
-                email: user.email,
-                token: generateToken(user._id)
-            });
-        } else {
-            res.status(401).json({ message: 'Invalid credentials' });
+        if (!user) {
+            console.log('Login failed: User not found for email:', email);
+            return res.status(401).json({ message: 'Invalid credentials: User not found' });
         }
+
+        if (!password) {
+            console.log('Login failed: No password provided for email:', email);
+            return res.status(400).json({ message: 'Please provide a password' });
+        }
+
+        if (!user.password) {
+            console.log('Login failed: User exists but has no password hash in DB.');
+            return res.status(401).json({ message: 'Invalid credentials: DB Error' });
+        }
+
+        try {
+            const isMatch = await bcrypt.compare(password, user.password);
+            if (!isMatch) {
+                console.log('Login failed: Password mismatch for email:', email);
+                return res.status(401).json({ message: 'Invalid credentials: Password mismatch' });
+            }
+        } catch (bcryptError) {
+            console.error('Bcrypt Compare Error:', bcryptError.message);
+            return res.status(500).json({ message: 'Bcrypt Error: ' + bcryptError.message });
+        }
+
+        res.json({
+            _id: user.id,
+            name: user.name,
+            email: user.email,
+            token: generateToken(user._id)
+        });
     } catch (error) {
+        console.error('Login Error:', error.message);
         res.status(500).json({ message: error.message });
     }
 };

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Send, Sparkles, CheckCircle, BrainCircuit } from 'lucide-react';
+import { ArrowLeft, Send, Sparkles, CheckCircle, BrainCircuit, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../services/api';
 import Navbar from '../components/Navbar';
@@ -16,6 +16,7 @@ const Recommendation = () => {
   });
   const [recommendation, setRecommendation] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [adding, setAdding] = useState(false);
   const navigate = useNavigate();
 
   const handleNext = () => setStep(step + 1);
@@ -31,26 +32,53 @@ const Recommendation = () => {
       setTimeout(() => {
         const recs = {
           student: [
-            "Pomodoro Technique: 25m study / 5m break",
-            "Active Recall: Test yourself every 20 minutes",
-            "Feynman Technique: Explain topics in simple terms",
-            "Prioritize: Complete toughest subjects first thing in the morning"
+            { title: `Deep Study: ${formData.focusArea || 'Core Subjects'}`, time: 120 },
+            { title: "Review past notes & Active Recall", time: 30 },
+            { title: "Feynman Technique: Explain difficult concepts", time: 45 },
+            { title: "Practice problem sets / quizzes", time: 60 }
           ],
           professional: [
-            "Time Blocking: Schedule specific deep-work blocks",
-            "Eat the Frog: Tackle the most complex task first",
-            "Inbox Zero: Manage communications in batches",
-            "Batching: Group similar small tasks together"
+            { title: `Deep Work: ${formData.focusArea || 'Main Project'}`, time: 120 },
+            { title: "Inbox Zero & Communication batching", time: 30 },
+            { title: "Strategic planning for tomorrow", time: 15 },
+            { title: "Skill development / Reading", time: 45 }
+          ],
+          other: [
+            { title: `Focused Session: ${formData.focusArea || 'Primary Goal'}`, time: 90 },
+            { title: "Review progress and adjust plan", time: 20 },
+            { title: "Skill building", time: 45 }
           ]
         };
         
-        setRecommendation(recs[formData.role] || recs.student);
+        setRecommendation(recs[formData.role] || recs.other);
         setLoading(false);
         setStep(6);
       }, 1500);
     } catch (err) {
       console.error('Failed to submit');
       setLoading(false);
+    }
+  };
+
+  const handleAddAllToDashboard = async () => {
+    setAdding(true);
+    try {
+        const localDateStr = new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0];
+        
+        // Add each recommended task
+        for (const task of recommendation) {
+            await api.post('/tasks', {
+                title: task.title,
+                estimatedTime: task.time,
+                date: localDateStr,
+                days: 1
+            });
+        }
+        
+        navigate('/');
+    } catch (err) {
+        console.error('Failed to add tasks');
+        setAdding(false);
     }
   };
 
@@ -97,7 +125,7 @@ const Recommendation = () => {
                     <input 
                       type="number" 
                       placeholder="e.g. 4" 
-                      className="w-full p-6 bg-slate-50 dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 text-2xl font-black focus:ring-4 focus:ring-indigo-500/10 outline-none dark:text-white placeholder:text-slate-400"
+                      className="w-full p-6 pr-24 bg-slate-50 dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 text-2xl font-black focus:ring-4 focus:ring-indigo-500/10 outline-none dark:text-white placeholder:text-slate-400"
                       value={formData.studyHours}
                       onChange={(e) => setFormData({...formData, studyHours: e.target.value})}
                     />
@@ -152,7 +180,7 @@ const Recommendation = () => {
                   disabled={loading}
                   className="mt-10 w-full bg-indigo-600 text-white p-5 rounded-3xl font-black text-lg shadow-xl shadow-indigo-100 dark:shadow-none flex items-center justify-center gap-3 transition-all hover:bg-indigo-700"
                 >
-                  {loading ? 'Analyzing Profile...' : 'Generate My Vision'} <Sparkles size={22} />
+                  {loading ? 'Analyzing Profile...' : 'Generate My Action Plan'} <Sparkles size={22} />
                 </button>
               </motion.div>
             )}
@@ -163,7 +191,7 @@ const Recommendation = () => {
                     <div className="bg-emerald-100 dark:bg-emerald-900/30 w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-6 text-emerald-600 dark:text-emerald-400">
                         <CheckCircle size={40} />
                     </div>
-                    <h2 className="text-4xl font-black dark:text-white">Your Success Blueprint</h2>
+                    <h2 className="text-4xl font-black dark:text-white">Your Action Plan</h2>
                     <p className="text-slate-500 dark:text-slate-400 font-medium mt-2">Customized for your {formData.role} path</p>
                 </div>
                 
@@ -179,17 +207,29 @@ const Recommendation = () => {
                             <div className="w-10 h-10 bg-indigo-100 dark:bg-indigo-900/30 rounded-xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-black shrink-0">
                                 {i + 1}
                             </div>
-                            <p className="font-bold text-slate-700 dark:text-slate-200 leading-relaxed">{rec}</p>
+                            <div className="flex flex-col justify-center">
+                                <p className="font-bold text-slate-700 dark:text-slate-200 leading-relaxed">{rec.title}</p>
+                                <p className="text-xs font-bold text-indigo-500 dark:text-indigo-400 uppercase tracking-widest mt-1">{Math.floor(rec.time/60)}h {rec.time%60}m</p>
+                            </div>
                         </motion.div>
                     ))}
                 </div>
 
-                <button 
-                  onClick={() => navigate('/')} 
-                  className="w-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 p-5 rounded-3xl font-black text-lg shadow-xl hover:opacity-90 transition-all"
-                >
-                  Start My Mission
-                </button>
+                <div className="flex gap-4">
+                    <button 
+                      onClick={() => navigate('/')} 
+                      className="flex-1 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white p-5 rounded-3xl font-black text-lg shadow-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
+                    >
+                      Maybe Later
+                    </button>
+                    <button 
+                      onClick={handleAddAllToDashboard}
+                      disabled={adding}
+                      className="flex-[2] bg-indigo-600 text-white p-5 rounded-3xl font-black text-lg shadow-xl flex justify-center items-center gap-2 hover:bg-indigo-700 transition-all"
+                    >
+                      {adding ? 'Adding...' : 'Add All to Dashboard'} <Plus size={20} />
+                    </button>
+                </div>
               </motion.div>
             )}
           </AnimatePresence>

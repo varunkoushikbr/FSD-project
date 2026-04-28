@@ -71,6 +71,7 @@ exports.updateTask = async (req, res) => {
         const isMarkingComplete = req.body.completed === true && task.completed === false;
 
         let pointsAwarded = 0;
+        let motivationMsg = '';
         if (isMarkingComplete) {
             req.body.status = 'completed';
             
@@ -84,6 +85,16 @@ exports.updateTask = async (req, res) => {
             
             if (task.estimatedTime > 0 && task.actualTime <= task.estimatedTime) {
                 pointsAwarded *= 2; // Double points for efficiency
+                motivationMsg = 'Amazing efficiency! You beat your estimate!';
+            } else {
+                motivationMsg = 'Great job completing your task!';
+            }
+
+            // Early bird bonus: Before 12 PM
+            const currentHour = new Date().getHours();
+            if (currentHour < 12) {
+                pointsAwarded = Math.floor(pointsAwarded * 1.5);
+                motivationMsg = 'Early Bird Bonus! 1.5x Points! ' + motivationMsg;
             }
             
             req.body.points = pointsAwarded;
@@ -108,6 +119,7 @@ exports.updateTask = async (req, res) => {
         res.json({
             task: updatedTask,
             pointsAwarded,
+            motivationMsg,
             streak: streakData ? {
                 currentStreak: streakData.currentStreak,
                 milestoneReached: [7, 30, 100].includes(streakData.currentStreak)
